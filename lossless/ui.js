@@ -4,7 +4,9 @@
 'use strict';
 const http = require('http');
 const { pack, unpack, FAST } = require('./router.js');
+const { isArchive, listArchive, extractOne } = require('./archive.js');
 const PORT = 8737;
+const archives = new Map(); let aid = 0;      // cache opened archives for per-file extract
 
 const readBody = (req, cb) => {
   const chunks = []; let size = 0;
@@ -86,9 +88,11 @@ async function compress(f){
   row.done(kb(o)+' → '+kb(p)+'  ·  '+(o/p).toFixed(2)+'x', codec, blob, f.name+'.rz', results, o);
 }
 async function extract(f){
-  const row=addRow(f.name, 'extracting…');
+  const row=addRow(f.name, 'reading…');
   const buf=await f.arrayBuffer();
-  const r=await fetch('/unpack',{method:'POST',body:buf});
+  const meta=await (await fetch('/open',{method:'POST',body:buf})).json();
+  if(meta.archive){ row.archive(meta); return; }               // multi-file: browse it
+  const r=await fetch('/unpack',{method:'POST',body:buf});      // single file: just restore
   if(!r.ok){ row.fail(await r.text()); return; }
   const blob=await r.blob();
   row.done(kb(f.size)+' → '+kb(blob.size)+'  restored', 'extract', blob, f.name.replace(/\\.rz$/,''));
@@ -114,6 +118,23 @@ function addRow(name, status){
         +'<div class="meta">'+meta+'</div><a class="dl" href="'+url+'" download="'+dlname+'">Save</a></div>'+tourney;
       el.style.flexDirection='column'; el.style.alignItems='stretch';
     },
+    archive(meta){
+      el.style.flexDirection='column'; el.style.alignItems='stretch';
+      el.innerHTML='<div style="display:flex;gap:10px;align-items:center"><div class="nm">'+name
+        +'</div><span class="tag">archive · '+meta.entries.length+' files</span></div>'
+        +'<div class="tourney" style="grid-template-columns:1fr auto auto">'+meta.entries.map(e=>
+          '<div class="cn" style="color:var(--txt);overflow:hidden;text-overflow:ellipsis">'+e.name+'</div>'
+          +'<div class="sz">'+kb(e.origLen)+'</div>'
+          +'<button data-id="'+meta.id+'" data-i="'+e.i+'" data-nm="'+e.name.replace(/"/g,'')+'">Save</button>'
+        ).join('')+'</div>';
+      el.querySelectorAll('button').forEach(btn=>btn.onclick=async()=>{
+        btn.textContent='…';
+        const r=await fetch('/extract?id='+btn.dataset.id+'&i='+btn.dataset.i);
+        const blob=await r.blob(), u=URL.createObjectURL(blob);
+        const link=document.createElement('a'); link.href=u; link.download=btn.dataset.nm.split('/').pop(); link.click();
+        btn.textContent='Save';
+      });
+    },
     fail(msg){ el.querySelector('.meta').textContent='error: '+msg; }
   };
 }
@@ -138,6 +159,24 @@ http.createServer((req, res) => {
       try { res.setHeader('Content-Type', 'application/octet-stream'); res.end(unpack(buf)); }
       catch (e) { res.statusCode = 500; res.end('not a valid .rz file'); }
     }); return;
+  }
+  if (req.method === 'POST' && p === '/open') {                 // is this .rz a multi-file archive?
+    readBody(req, (buf) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (!isArchive(buf)) { res.end('{"archive":false}'); return; }
+      const id = ++aid; archives.set(id, buf);
+      if (archives.size > 8) archives.delete(archives.keys().next().value);
+      const entries = listArchive(buf).map((e, i) => ({ name: e.name, origLen: e.origLen, compLen: e.compLen, i }));
+      res.end(JSON.stringify({ archive: true, id, entries }));
+    }); return;
+  }
+  if (req.method === 'GET' && p === '/extract') {                // pull one file out of a cached archive
+    const q = new URLSearchParams(req.url.split('?')[1] || '');
+    const arc = archives.get(+q.get('id'));
+    if (!arc) { res.statusCode = 404; res.end('archive expired — re-drop it'); return; }
+    try { res.setHeader('Content-Type', 'application/octet-stream'); res.end(extractOne(arc, listArchive(arc)[+q.get('i')])); }
+    catch (e) { res.statusCode = 500; res.end(String(e.message)); }
+    return;
   }
   res.statusCode = 404; res.end('not found');
 }).listen(PORT, () => console.log('rz UI ▸ open http://localhost:' + PORT));
