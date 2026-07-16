@@ -53,10 +53,17 @@ If they aren't installed, `rz` just skips them.
 
 ## Use it
 ```bash
-rz pack <file> [out.rz]      compress (auto-picks the smallest codec, prints which won)
-rz unpack <file.rz> [out]    restore, byte-for-byte
+rz pack <file> [out.rz]      compress one file (auto-picks the smallest codec)
+rz unpack <file.rz> [out]    restore one file, byte-for-byte
+
+rz a <archive.rz> <files...> bundle many files into one archive
+rz l <archive.rz>            list an archive's contents (no extract)
+rz x <archive.rz> [out-dir]  extract an archive
+
 rz bench <file|folder>       ratio + speed vs every codec
 ```
+In the **GUI**, drop a multi-file `.rz` to browse it and Save individual files —
+create archives with `rz a` (drag-to-bundle in the UI is on the roadmap).
 
 ## Compare against the best tools in the market
 Point `bench` at a standard corpus so results match public leaderboards:
