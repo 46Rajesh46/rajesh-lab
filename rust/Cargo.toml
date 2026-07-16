@@ -1,0 +1,20 @@
+[package]
+name = "rz"
+version = "0.2.0"
+edition = "2021"
+description = "Native try-all lossless compressor (Rust). Fast, ~2 MB exe."
+
+[[bin]]
+name = "rz"
+path = "src/main.rs"
+
+[dependencies]
+# All pure-Rust or vendored — no system libraries needed, builds anywhere.
+zstd = "0.13"        # zstd (vendored libzstd)
+brotli = "6"         # pure-Rust brotli
+flate2 = "1"         # gzip/deflate (miniz_oxide backend)
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true         # smallest binary

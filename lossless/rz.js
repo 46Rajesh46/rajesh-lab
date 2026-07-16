@@ -5,11 +5,24 @@
 const fs = require('fs'), path = require('path');
 const { pack, unpack } = require('./router.js');
 const { createArchive, listArchive, extractAll } = require('./archive.js');
+const { encrypt, decrypt, isEncrypted } = require('./enc.js');
 const bench = require('./bench.js');
 
 const human = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + ' MB' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' KB' : n + ' B';
-const args = process.argv.slice(2);
+
+// pull an optional password flag (-p / --password PASSWORD) out of argv
+let password = null;
+const raw = process.argv.slice(2), args = [];
+for (let i = 0; i < raw.length; i++) {
+  if (raw[i] === '-p' || raw[i] === '--password') password = raw[++i];
+  else args.push(raw[i]);
+}
 const [cmd, a, b] = args;
+const seal = (buf) => password ? encrypt(buf, password) : buf;
+const open = (buf) => {
+  if (isEncrypted(buf)) { if (!password) throw new Error('this .rz is encrypted — add -p <password>'); return decrypt(buf, password); }
+  return buf;
+};
 
 function usage() {
   console.log(`rz — lossless compressor (best-of-all-codecs)
@@ -21,6 +34,7 @@ function usage() {
   rz x <archive.rz> [out-dir]      extract an archive (default: current dir)
   rz bench  <file|folder>          compare vs gzip / brotli / xz / zstd
 
+  add  -p <password>  to any pack/unpack/a/l/x to AES-256 encrypt/decrypt.
 Install external codecs (optional) to add them to the lineup: zstd, xz.`);
 }
 
@@ -31,33 +45,35 @@ function safeJoin(dir, name) {
   return dest;
 }
 
+try {
 if (cmd === 'pack') {
   if (!a) { usage(); process.exit(1); }
   const inp = fs.readFileSync(a), out = b || a + '.rz', p = pack(inp);
-  fs.writeFileSync(out, p.bytes);
-  console.log(`packed ${a} (${human(inp.length)}) -> ${out} (${human(p.bytes.length)})  ${(inp.length / p.bytes.length).toFixed(2)}x  via ${p.name}`);
+  const bytes = seal(p.bytes);
+  fs.writeFileSync(out, bytes);
+  console.log(`packed ${a} (${human(inp.length)}) -> ${out} (${human(bytes.length)})  ${(inp.length / bytes.length).toFixed(2)}x  via ${p.name}${password ? ' + encrypted' : ''}`);
 } else if (cmd === 'unpack') {
   if (!a) { usage(); process.exit(1); }
   const out = b || (a.endsWith('.rz') ? a.slice(0, -3) : a + '.out');
-  fs.writeFileSync(out, unpack(fs.readFileSync(a)));
+  fs.writeFileSync(out, unpack(open(fs.readFileSync(a))));
   console.log(`restored ${a} -> ${out}`);
 } else if (cmd === 'a') {
   const arch = a, inputs = args.slice(2);
   if (!arch || !inputs.length) { usage(); process.exit(1); }
   const files = inputs.map((f) => ({ name: path.basename(f), buf: fs.readFileSync(f) }));
-  const out = createArchive(files);
+  const out = seal(createArchive(files));
   fs.writeFileSync(arch, out);
   const orig = files.reduce((s, f) => s + f.buf.length, 0);
-  console.log(`archived ${files.length} file(s) (${human(orig)}) -> ${arch} (${human(out.length)})  ${(orig / out.length).toFixed(2)}x`);
+  console.log(`archived ${files.length} file(s) (${human(orig)}) -> ${arch} (${human(out.length)})  ${(orig / out.length).toFixed(2)}x${password ? ' + encrypted' : ''}`);
 } else if (cmd === 'l') {
   if (!a) { usage(); process.exit(1); }
-  const entries = listArchive(fs.readFileSync(a));
+  const entries = listArchive(open(fs.readFileSync(a)));
   console.log(`${a} — ${entries.length} file(s)\n`);
   for (const e of entries) console.log(`  ${human(e.origLen).padStart(9)} -> ${human(e.compLen).padStart(9)}  ${(e.origLen / e.compLen).toFixed(2)}x  ${e.name}`);
 } else if (cmd === 'x') {
   if (!a) { usage(); process.exit(1); }
   const outDir = b || '.';
-  const files = extractAll(fs.readFileSync(a));
+  const files = extractAll(open(fs.readFileSync(a)));
   for (const f of files) {
     const dest = safeJoin(outDir, f.name);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -69,3 +85,4 @@ if (cmd === 'pack') {
   if (!a) { usage(); process.exit(1); }
   bench.run(a);
 } else usage();
+} catch (e) { console.error('rz: ' + e.message); process.exit(1); }

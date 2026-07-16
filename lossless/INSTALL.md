@@ -61,9 +61,14 @@ rz l <archive.rz>            list an archive's contents (no extract)
 rz x <archive.rz> [out-dir]  extract an archive
 
 rz bench <file|folder>       ratio + speed vs every codec
+
+# encryption — add -p <password> to any of the above (AES-256-GCM)
+rz pack secret.pdf -p mypass
+rz unpack secret.pdf.rz -p mypass       # wrong password is rejected
 ```
-In the **GUI**, drop a multi-file `.rz` to browse it and Save individual files —
-create archives with `rz a` (drag-to-bundle in the UI is on the roadmap).
+In the **GUI** (`node ui.js`): drag **multiple files** → they bundle into one archive;
+drop a multi-file `.rz` → browse it and Save individual files; type a **password** to
+encrypt/decrypt. Everything runs locally.
 
 ## Compare against the best tools in the market
 Point `bench` at a standard corpus so results match public leaderboards:
