@@ -9,10 +9,9 @@ name = "rz"
 path = "src/main.rs"
 
 [dependencies]
-# All pure-Rust or vendored — no system libraries needed, builds anywhere.
-zstd = "0.13"        # zstd (vendored libzstd)
-brotli = "6"         # pure-Rust brotli
-flate2 = "1"         # gzip/deflate (miniz_oxide backend)
+# Pure-Rust only — no C compiler / system libraries needed, builds anywhere.
+brotli = "6"                                   # pure-Rust brotli
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }  # gzip via miniz_oxide (pure Rust)
 
 [profile.release]
 opt-level = 3
