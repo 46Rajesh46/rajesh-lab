@@ -37,16 +37,23 @@ const CODECS = [
 ];
 const byTag = Object.fromEntries(CODECS.map((c) => [c.tag, c]));
 
-// Try every codec, return the smallest tagged encoding: [tag byte][payload].
-function pack(buf) {
-  let best = null;
+// Fast preset: skip the slow context-mixing coders, keep the quick ones.
+const FAST = ['store', 'gzip', 'brotli', 'zstd'];
+
+// Try every codec (or a preset subset), return the smallest tagged encoding
+// [tag byte][payload], plus every codec's size so callers can show a "tournament".
+function pack(buf, opts = {}) {
+  const allow = opts.only || null;
+  let best = null; const all = [];
   for (const codec of CODECS) {
+    if (allow && !allow.includes(codec.name)) continue;
     let out;
     try { out = codec.c(buf); } catch (e) { out = null; }
     if (out == null) continue;                       // unavailable / failed
+    all.push({ name: codec.name, len: out.length + 1 });
     if (!best || out.length < best.out.length) best = { codec, out };
   }
-  return { tag: best.codec.tag, name: best.codec.name,
+  return { tag: best.codec.tag, name: best.codec.name, all,
            bytes: Buffer.concat([Buffer.from([best.codec.tag]), best.out]) };
 }
 function unpack(data) { return byTag[data[0]].d(data.subarray(1)); }
@@ -93,4 +100,4 @@ if (require.main === module) {
   else if (a)              report(a, fs.readFileSync(a));
   else console.log('usage: --selftest | <file> | pack <in> <out> | unpack <in> <out>');
 }
-module.exports = { pack, unpack, CODECS };
+module.exports = { pack, unpack, CODECS, FAST };
