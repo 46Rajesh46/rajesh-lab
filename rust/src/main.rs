@@ -39,7 +39,7 @@ fn brotli_d(d: &[u8]) -> Vec<u8> {
 /// Try every codec, keep the smallest; prepend the winning tag byte.
 fn pack(data: &[u8]) -> Vec<u8> {
     let mut best: (u8, Vec<u8>) = (0, data.to_vec()); // store
-    for (tag, out) in [(1u8, gzip(data)), (2u8, brotli_c(data)), (4u8, zstd::encode_all(data, 19).unwrap())] {
+    for (tag, out) in [(1u8, gzip(data)), (2u8, brotli_c(data))] {
         if out.len() < best.1.len() { best = (tag, out); }
     }
     let mut v = Vec::with_capacity(best.1.len() + 1);
@@ -54,7 +54,6 @@ fn unpack(data: &[u8]) -> Vec<u8> {
         0 => body.to_vec(),
         1 => gunzip(body),
         2 => brotli_d(body),
-        4 => zstd::decode_all(body).unwrap(),
         t => panic!("codec tag {} not supported by the Rust build yet (use the JS tool)", t),
     }
 }
