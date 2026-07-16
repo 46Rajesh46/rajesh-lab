@@ -6,7 +6,8 @@
     "rz": "rz.js"
   },
   "scripts": {
-    "test": "node router.js --selftest && node lpaq.js --selftest && node cm.js --selftest"
+    "test": "node router.js --selftest && node lpaq.js --selftest && node cm.js --selftest",
+    "ui": "node ui.js"
   },
   "engines": {
     "node": ">=18"
