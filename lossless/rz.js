@@ -33,6 +33,7 @@ function usage() {
   rz l <archive.rz>                list an archive's contents
   rz x <archive.rz> [out-dir]      extract an archive (default: current dir)
   rz bench  <file|folder>          compare vs gzip / brotli / xz / zstd
+  rz ui                            open the graphical File Manager (GUI)
 
   add  -p <password>  to any pack/unpack/a/l/x to AES-256 encrypt/decrypt.
 Install external codecs (optional) to add them to the lineup: zstd, xz.`);
@@ -84,5 +85,7 @@ if (cmd === 'pack') {
 } else if (cmd === 'bench') {
   if (!a) { usage(); process.exit(1); }
   bench.run(a);
+} else if (cmd === 'ui') {
+  require('./ui.js');                       // starts the 7-Zip-style GUI + opens the browser
 } else usage();
 } catch (e) { console.error('rz: ' + e.message); process.exit(1); }

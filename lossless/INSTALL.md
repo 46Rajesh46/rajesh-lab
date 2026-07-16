@@ -1,8 +1,22 @@
 # Install & use `rz`
 
-A lossless compressor that auto-picks the best codec and can benchmark itself against
-gzip / brotli / xz / zstd. **Prerequisite: Node.js 18+** (`node -v`). Get it from
-[nodejs.org](https://nodejs.org) — or it's already on this PC via Laragon.
+A lossless compressor with a 7-Zip-style GUI. Auto-picks the best codec, does multi-file
+archives + AES-256 encryption, and benchmarks itself against gzip / brotli / xz / zstd.
+
+---
+
+## Easiest — the Setup installer (no Node, no admin)
+Download **`rz-setup.zip`** from the [Releases](../../releases) page, unzip, and
+double-click **`install.bat`**. It installs the `rz` command, a Start-Menu app
+**"rz File Manager"** (the GUI), and a right-click **"Compress with rz"** on any file.
+(SmartScreen may warn — More info → Run anyway. Uninstall: `uninstall.bat`.)
+
+```
+rz ui                    open the graphical File Manager
+rz pack myfile           compress   ·   rz a box.rz a b c   bundle   ·   rz x box.rz   extract
+```
+
+*The options below are for developers who have Node.js and want to run from source.*
 
 ---
 

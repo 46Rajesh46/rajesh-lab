@@ -13,3 +13,8 @@ lossless/rz.exe
 lossless/rz.sea.js
 lossless/sea-prep.blob
 *.blob
+
+# installer payload + rust build output (shipped via Releases)
+setup/rz.exe
+rust/target/
+*.zip
