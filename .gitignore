@@ -7,3 +7,9 @@
 /quantum/**/*.json
 
 node_modules/
+
+# SEA build artifacts (rz.exe ships via GitHub Releases)
+lossless/rz.exe
+lossless/rz.sea.js
+lossless/sea-prep.blob
+*.blob

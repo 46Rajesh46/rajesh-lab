@@ -67,8 +67,23 @@ npm test            # runs the round-trip self-tests (SHA-256 verified)
 The `.rz` format is one tag byte + payload — fully documented in
 [`FORMAT.md`](FORMAT.md), so a decoder can be written in any language.
 
-## Advanced: a standalone .exe (no Node needed)
-Node can bundle itself into a single executable via its built-in
-[Single Executable Applications](https://nodejs.org/api/single-executable-applications.html)
-feature (uses `postject` to inject the blob). It's extra moving parts, so it's not shipped
-here — ask if you want it built.
+## Option D — standalone `rz.exe` (no Node needed)
+A single Windows executable that runs on any PC **without Node installed**.
+
+**Download:** grab `rz.exe` from the repo's **[Releases](../../releases)** page, then run it
+from a terminal:
+```bat
+rz.exe pack   myfile
+rz.exe unpack myfile.rz
+rz.exe bench  myfolder
+```
+Put its folder on PATH to just type `rz`. First run, Windows SmartScreen may warn (it's
+unsigned) → **More info → Run anyway**.
+
+**Or build it yourself** (needs Node once; the exe then needs nothing):
+```bat
+cd lossless
+build-exe.bat
+```
+Note: the exe is ~92 MB because it embeds the Node runtime — that's normal for single-file
+Node executables. The `npm`/`rz` command (Option A) is far smaller if you already have Node.
