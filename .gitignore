@@ -1,0 +1,9 @@
+# generated build artifacts
+*.real.js
+
+# runtime data stores (created when an app runs)
+/realscript/examples/*.json
+/records/*.json
+/quantum/**/*.json
+
+node_modules/

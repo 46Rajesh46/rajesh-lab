@@ -1,0 +1,21 @@
+# hello.real — a full-stack RealScript app: a page (frontend) + an API (backend)
+# run it:  node ..\realc.js hello.real   (or double-click ..\run.bat)
+
+serve on 3000
+
+# --- FRONTEND: an HTML page that calls our own API ---
+route "/" do
+  show "<h1>Hello from RealScript</h1>
+        <p>A full-stack language by Rajesh.</p>
+        <p id=out>loading…</p>
+        <script>
+          fetch('/api/greeting').then(r => r.json())
+            .then(d => document.getElementById('out').textContent = d.message)
+        </script>"
+end
+
+# --- BACKEND: a JSON API the page above fetches ---
+api "/api/greeting" do
+  let who = "Rajesh"
+  give { message: "Hi " + who + ", the backend answered." }
+end
