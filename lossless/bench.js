@@ -13,8 +13,7 @@ const filesIn = (p) => fs.statSync(p).isFile() ? [p]
   : fs.readdirSync(p).map((f) => path.join(p, f)).filter((f) => fs.statSync(f).isFile());
 const human = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + ' MB' : n >= 1e3 ? (n / 1e3).toFixed(1) + ' KB' : n + ' B';
 
-function main() {
-  const target = process.argv[2];
+function run(target) {
   if (!target) { console.log('usage: node lossless/bench.js <file|dir>'); return; }
   const files = filesIn(target);
   const names = [...CODECS.map((c) => c.name), 'router'];
@@ -46,4 +45,5 @@ function main() {
   }
   console.log('\n  (higher ratio = smaller output. router = best-of-all per file.)');
 }
-main();
+if (require.main === module) run(process.argv[2]);
+module.exports = { run };
