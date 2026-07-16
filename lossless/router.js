@@ -91,4 +91,4 @@ if (require.main === module) {
   else if (a)              report(a, fs.readFileSync(a));
   else console.log('usage: --selftest | <file> | pack <in> <out> | unpack <in> <out>');
 }
-module.exports = { pack, unpack };
+module.exports = { pack, unpack, CODECS };
