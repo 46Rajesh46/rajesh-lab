@@ -34,6 +34,15 @@ rz pack myfile
 
 ---
 
+## Option E — the GUI (drag & drop, like 7-Zip)
+A local web app: drag files to compress, drop a `.rz` to extract. Runs on your machine —
+nothing is uploaded.
+```bash
+cd lossless
+node ui.js          # then open http://localhost:8737
+# or on Windows, double-click  rz-ui.bat  (opens the browser for you)
+```
+
 ## Add more codecs (optional)
 `rz` auto-detects external tools and adds them to the "try-all" lineup — no config:
 ```bash
