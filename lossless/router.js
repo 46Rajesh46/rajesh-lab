@@ -11,6 +11,7 @@
 'use strict';
 const zlib = require('zlib'), crypto = require('crypto'), cp = require('child_process'), fs = require('fs');
 const cm = require('./cm.js');
+const lpaq = require('./lpaq.js');
 
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
@@ -32,6 +33,7 @@ const CODECS = [
   { tag: 3, name: 'cm',     c: (b) => cm.compress(b),             d: (b) => cm.decompress(b) },
   { tag: 4, name: 'zstd',   ...ext('zstd', ['-19', '-c'], ['-d', '-c']) },
   { tag: 5, name: 'xz',     ...ext('xz', ['-9', '-c'], ['-dc']) },
+  { tag: 6, name: 'lpaq',   c: (b) => lpaq.compress(b),           d: (b) => lpaq.decompress(b) },
 ];
 const byTag = Object.fromEntries(CODECS.map((c) => [c.tag, c]));
 
