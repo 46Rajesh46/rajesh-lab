@@ -7,3 +7,6 @@
 /quantum/**/*.json
 
 node_modules/
+
+# big derivable dictionary (regenerate: node compress/demo.js --build)
+/compress/dict.csv
