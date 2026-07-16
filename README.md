@@ -6,6 +6,8 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 
 - 🌐 **RealScript** — a full-stack web language in one dependency-free file: **8,968 bytes**
 - ⚛️ **QScript** — a readable quantum language on a pure-JS simulator
+- 🗜️ **rz** — a lossless compressor + our own `lpaq` coder that **beats gzip/brotli/xz on text**
+- 📖 **Number dictionary** — 370,105 words ↔ numbers, script-built, free for anyone
 - 📜 Records path is honest: what's self-claimable vs. what a real Guinness certificate needs
 
 ---
@@ -17,6 +19,8 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 | [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, storage, JSON API. | working ✅ |
 | [`quantum/qscript.js`](quantum/qscript.js) | **QScript** — my quantum language (`qubits/h/x/z/cnot/measure`) on `qsim.js`. | working ✅ |
 | [`quantum/qsim.js`](quantum/qsim.js) | Pure-JS quantum simulator — runs a real entangled Bell state. | working ✅ |
+| [`lossless/`](lossless/) | **rz** — try-all lossless compressor + our `lpaq` context-mixing coder (beats gzip/brotli/xz on text). Installable CLI + benchmark. | working ✅ |
+| [`compress/`](compress/) | The **number dictionary** (370k words ↔ numbers) + the honest compression strategy synthesized from 12 local AI models. | published |
 | [`records/SMALLEST-CLAIM.md`](records/SMALLEST-CLAIM.md) | The "smallest full-stack language" claim + how anyone re-measures it. | published |
 | [`records/GUINNESS-APPLICATION.md`](records/GUINNESS-APPLICATION.md) | The timed-feat application package for an actual Guinness certificate. | ready to submit |
 | [`AMBITION-ROADMAP.md`](AMBITION-ROADMAP.md) | The honest records/recognition plan. | plan |
@@ -31,7 +35,14 @@ node realscript/realc.js --selftest                 # correctness tests
 # QScript — two qubits entangle (only 00/11 ever appear)
 node quantum/qscript.js quantum/examples/bell.q
 node quantum/qscript.js --selftest
+
+# rz — lossless compressor (install once, then use anywhere)
+cd lossless && npm install -g .
+rz pack myfile          # -> myfile.rz (auto-picks the best codec)
+rz unpack myfile.rz     # restore, byte-for-byte
+rz bench ./my-data      # compare vs gzip/brotli/xz/zstd
 ```
+Full install guide: [`lossless/INSTALL.md`](lossless/INSTALL.md).
 
 ## The claim, and how to verify it yourself (2 minutes, Node only)
 
