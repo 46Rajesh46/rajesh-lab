@@ -1,12 +1,12 @@
 {
   "name": "rz-compress",
-  "version": "0.1.0",
-  "description": "Try-all lossless compressor + context-mixing coder (lpaq). Beats gzip/brotli/xz on text; benchmark vs the market.",
+  "version": "0.2.0",
+  "description": "Try-all lossless compressor + context-mixing coder (lpaq). Multi-file archives, AES-256 encryption, GUI. Beats gzip/brotli/xz on text.",
   "bin": {
     "rz": "rz.js"
   },
   "scripts": {
-    "test": "node router.js --selftest && node lpaq.js --selftest && node cm.js --selftest && node archive.js --selftest",
+    "test": "node router.js --selftest && node lpaq.js --selftest && node cm.js --selftest && node archive.js --selftest && node enc.js --selftest",
     "ui": "node ui.js"
   },
   "engines": {

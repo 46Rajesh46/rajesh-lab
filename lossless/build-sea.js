@@ -4,7 +4,7 @@
 // anything else falls through to Node's real require (built-ins).
 'use strict';
 const fs = require('fs');
-const MODS = ['cm.js', 'lpaq.js', 'router.js', 'bench.js', 'rz.js'];
+const MODS = ['cm.js', 'lpaq.js', 'router.js', 'archive.js', 'enc.js', 'bench.js', 'rz.js'];
 
 let out = `// AUTO-GENERATED — do not edit. Bundle of: ${MODS.join(', ')}
 'use strict';

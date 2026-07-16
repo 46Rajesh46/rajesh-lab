@@ -4,9 +4,13 @@
 'use strict';
 const http = require('http');
 const { pack, unpack, FAST } = require('./router.js');
-const { isArchive, listArchive, extractOne } = require('./archive.js');
+const { createArchive, isArchive, listArchive, extractOne } = require('./archive.js');
+const { encrypt, decrypt, isEncrypted } = require('./enc.js');
 const PORT = 8737;
 const archives = new Map(); let aid = 0;      // cache opened archives for per-file extract
+const pwOf = (req) => req.headers['x-password'] || '';
+const seal = (buf, pw) => pw ? encrypt(buf, pw) : buf;
+const open = (buf, pw) => isEncrypted(buf) ? decrypt(buf, pw) : buf;   // throws on wrong pw
 
 const readBody = (req, cb) => {
   const chunks = []; let size = 0;
@@ -53,9 +57,13 @@ const HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 </style></head><body><div class="wrap">
   <h1>r<span>z</span> compressor</h1>
   <p class="sub">Drag files to compress. Drop a <code>.rz</code> to extract. Runs locally — nothing is uploaded.</p>
-  <div class="seg" id="seg">
-    <button data-mode="max" class="on">Max ratio</button>
-    <button data-mode="fast">Fast</button>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
+    <div class="seg" id="seg" style="margin:0">
+      <button data-mode="max" class="on">Max ratio</button>
+      <button data-mode="fast">Fast</button>
+    </div>
+    <input id="pw" type="password" placeholder="password (optional)" autocomplete="off"
+      style="font:inherit;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt)">
   </div>
   <div class="drop" id="drop">
     <b>Drop files here</b><small>or click to choose — best codec is picked automatically</small>
@@ -65,8 +73,9 @@ const HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <footer>rz · best-of-all lossless · gzip · brotli · xz · lpaq (ours)</footer>
 </div>
 <script>
-const drop=document.getElementById('drop'),file=document.getElementById('file'),list=document.getElementById('list'),seg=document.getElementById('seg');
+const drop=document.getElementById('drop'),file=document.getElementById('file'),list=document.getElementById('list'),seg=document.getElementById('seg'),pw=document.getElementById('pw');
 const kb=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':n>=1e3?(n/1e3).toFixed(1)+' KB':n+' B';
+const H=()=>pw.value?{'X-Password':pw.value}:{};
 let mode='max';
 seg.addEventListener('click',e=>{ if(!e.target.dataset.mode)return; mode=e.target.dataset.mode;
   [...seg.children].forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); });
@@ -76,23 +85,45 @@ drop.onclick=()=>file.click();
 drop.addEventListener('drop',ev=>handle([...ev.dataTransfer.files]));
 file.addEventListener('change',()=>handle([...file.files]));
 
-function handle(files){ files.forEach(f=> f.name.endsWith('.rz') ? extract(f) : compress(f)); }
+function handle(files){
+  const archives=files.filter(f=>f.name.endsWith('.rz')), plain=files.filter(f=>!f.name.endsWith('.rz'));
+  archives.forEach(extract);
+  if(plain.length>1) bundle(plain);            // multiple files -> one archive
+  else plain.forEach(compress);
+}
 
 async function compress(f){
   const row=addRow(f.name, mode==='fast'?'compressing (fast)…':'racing codecs…');
   const buf=await f.arrayBuffer();
-  const r=await fetch('/pack?mode='+mode,{method:'POST',body:buf});
+  const r=await fetch('/pack?mode='+mode,{method:'POST',body:buf,headers:H()});
   const blob=await r.blob();
   const codec=r.headers.get('X-Codec'), o=+r.headers.get('X-Orig'), p=+r.headers.get('X-Packed');
   const results=JSON.parse(r.headers.get('X-Results')||'[]');
   row.done(kb(o)+' → '+kb(p)+'  ·  '+(o/p).toFixed(2)+'x', codec, blob, f.name+'.rz', results, o);
 }
+
+async function bundle(files){
+  const row=addRow(files.length+' files → archive.rz', 'bundling…');
+  const bufs=await Promise.all(files.map(f=>f.arrayBuffer()));
+  const metas=files.map((f,i)=>({name:f.name,len:bufs[i].byteLength}));
+  const head=new TextEncoder().encode(JSON.stringify(metas));
+  const total=4+head.length+bufs.reduce((s,b)=>s+b.byteLength,0);
+  const body=new Uint8Array(total); new DataView(body.buffer).setUint32(0,head.length);
+  body.set(head,4); let off=4+head.length;
+  for(const b of bufs){ body.set(new Uint8Array(b),off); off+=b.byteLength; }
+  const r=await fetch('/archive',{method:'POST',body,headers:H()});
+  if(!r.ok){ row.fail(await r.text()); return; }
+  const blob=await r.blob(), o=+r.headers.get('X-Orig'), p=+r.headers.get('X-Packed');
+  row.done(kb(o)+' → '+kb(p)+'  ·  '+(o/p).toFixed(2)+'x', 'archive '+r.headers.get('X-Count')+(pw.value?'+enc':''), blob, 'archive.rz');
+}
 async function extract(f){
   const row=addRow(f.name, 'reading…');
   const buf=await f.arrayBuffer();
-  const meta=await (await fetch('/open',{method:'POST',body:buf})).json();
+  const meta=await (await fetch('/open',{method:'POST',body:buf,headers:H()})).json();
+  if(meta.encrypted){ row.fail('encrypted — type the password above, then re-drop'); return; }
+  if(meta.error){ row.fail(meta.error); return; }
   if(meta.archive){ row.archive(meta); return; }               // multi-file: browse it
-  const r=await fetch('/unpack',{method:'POST',body:buf});      // single file: just restore
+  const r=await fetch('/unpack',{method:'POST',body:buf,headers:H()}); // single file: restore
   if(!r.ok){ row.fail(await r.text()); return; }
   const blob=await r.blob();
   row.done(kb(f.size)+' → '+kb(blob.size)+'  restored', 'extract', blob, f.name.replace(/\\.rz$/,''));
@@ -144,27 +175,47 @@ http.createServer((req, res) => {
   const p = req.url.split('?')[0];
   if (req.method === 'GET' && p === '/') { res.setHeader('Content-Type', 'text/html'); res.end(HTML); return; }
   if (req.method === 'POST' && p === '/pack') {
-    const fast = /(?:\?|&)mode=fast/.test(req.url);
+    const fast = /(?:\?|&)mode=fast/.test(req.url), pw = pwOf(req);
     readBody(req, (buf) => {
       try {
         const r = pack(buf, fast ? { only: FAST } : {});
-        res.setHeader('X-Codec', r.name); res.setHeader('X-Orig', buf.length); res.setHeader('X-Packed', r.bytes.length);
+        const bytes = seal(r.bytes, pw);
+        res.setHeader('X-Codec', r.name + (pw ? '+enc' : '')); res.setHeader('X-Orig', buf.length); res.setHeader('X-Packed', bytes.length);
         res.setHeader('X-Results', JSON.stringify(r.all));
-        res.setHeader('Content-Type', 'application/octet-stream'); res.end(r.bytes);
+        res.setHeader('Content-Type', 'application/octet-stream'); res.end(bytes);
+      } catch (e) { res.statusCode = 500; res.end(String(e.message)); }
+    }); return;
+  }
+  if (req.method === 'POST' && p === '/archive') {              // bundle many files -> one archive
+    const pw = pwOf(req);
+    readBody(req, (buf) => {
+      try {
+        const hlen = buf.readUInt32BE(0);
+        const metas = JSON.parse(buf.toString('utf8', 4, 4 + hlen));
+        let off = 4 + hlen; const files = [];
+        for (const m of metas) { files.push({ name: m.name, buf: buf.subarray(off, off + m.len) }); off += m.len; }
+        const orig = files.reduce((s, f) => s + f.buf.length, 0);
+        const bytes = seal(createArchive(files), pw);
+        res.setHeader('X-Count', files.length); res.setHeader('X-Orig', orig); res.setHeader('X-Packed', bytes.length);
+        res.setHeader('Content-Type', 'application/octet-stream'); res.end(bytes);
       } catch (e) { res.statusCode = 500; res.end(String(e.message)); }
     }); return;
   }
   if (req.method === 'POST' && p === '/unpack') {
+    const pw = pwOf(req);
     readBody(req, (buf) => {
-      try { res.setHeader('Content-Type', 'application/octet-stream'); res.end(unpack(buf)); }
-      catch (e) { res.statusCode = 500; res.end('not a valid .rz file'); }
+      try { res.setHeader('Content-Type', 'application/octet-stream'); res.end(unpack(open(buf, pw))); }
+      catch (e) { res.statusCode = 500; res.end(String(e.message)); }
     }); return;
   }
   if (req.method === 'POST' && p === '/open') {                 // is this .rz a multi-file archive?
-    readBody(req, (buf) => {
+    const pw = pwOf(req);
+    readBody(req, (raw) => {
       res.setHeader('Content-Type', 'application/json');
+      if (isEncrypted(raw) && !pw) { res.end('{"encrypted":true}'); return; }
+      let buf; try { buf = open(raw, pw); } catch (e) { res.statusCode = 400; res.end('{"error":"wrong password"}'); return; }
       if (!isArchive(buf)) { res.end('{"archive":false}'); return; }
-      const id = ++aid; archives.set(id, buf);
+      const id = ++aid; archives.set(id, buf);                  // cache DECRYPTED archive
       if (archives.size > 8) archives.delete(archives.keys().next().value);
       const entries = listArchive(buf).map((e, i) => ({ name: e.name, origLen: e.origLen, compLen: e.compLen, i }));
       res.end(JSON.stringify({ archive: true, id, entries }));
