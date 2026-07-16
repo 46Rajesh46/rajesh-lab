@@ -3,7 +3,7 @@
 // your machine. Run:  node lossless/ui.js   ->  http://localhost:8737
 'use strict';
 const http = require('http');
-const { pack, unpack } = require('./router.js');
+const { pack, unpack, FAST } = require('./router.js');
 const PORT = 8737;
 
 const readBody = (req, cb) => {
@@ -38,9 +38,23 @@ const HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   a.dl{background:#1c2233;color:var(--txt);border:1px solid var(--line)}
   .spin{color:var(--dim);font-size:13px}
   footer{color:var(--dim);font-size:12.5px;margin-top:34px;text-align:center}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;margin:0 0 18px;gap:2px}
+  .seg button{background:transparent;color:var(--dim);padding:6px 16px;border-radius:8px}
+  .seg button.on{background:var(--accent);color:#fff}
+  .tourney{width:100%;margin-top:10px;display:grid;grid-template-columns:56px 1fr auto;gap:4px 10px;align-items:center}
+  .tourney .cn{color:var(--dim);font-size:12px}
+  .tourney .bar{height:8px;border-radius:6px;background:#1c2233;overflow:hidden}
+  .tourney .fill{height:100%;background:var(--line)}
+  .tourney .win .fill{background:var(--good)}
+  .tourney .sz{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .tourney .win .sz{color:var(--good)}
 </style></head><body><div class="wrap">
   <h1>r<span>z</span> compressor</h1>
   <p class="sub">Drag files to compress. Drop a <code>.rz</code> to extract. Runs locally — nothing is uploaded.</p>
+  <div class="seg" id="seg">
+    <button data-mode="max" class="on">Max ratio</button>
+    <button data-mode="fast">Fast</button>
+  </div>
   <div class="drop" id="drop">
     <b>Drop files here</b><small>or click to choose — best codec is picked automatically</small>
     <input type="file" id="file" multiple hidden>
@@ -49,8 +63,11 @@ const HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <footer>rz · best-of-all lossless · gzip · brotli · xz · lpaq (ours)</footer>
 </div>
 <script>
-const drop=document.getElementById('drop'),file=document.getElementById('file'),list=document.getElementById('list');
+const drop=document.getElementById('drop'),file=document.getElementById('file'),list=document.getElementById('list'),seg=document.getElementById('seg');
 const kb=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':n>=1e3?(n/1e3).toFixed(1)+' KB':n+' B';
+let mode='max';
+seg.addEventListener('click',e=>{ if(!e.target.dataset.mode)return; mode=e.target.dataset.mode;
+  [...seg.children].forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); });
 drop.onclick=()=>file.click();
 ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('hot')}));
 ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('hot')}));
@@ -60,13 +77,13 @@ file.addEventListener('change',()=>handle([...file.files]));
 function handle(files){ files.forEach(f=> f.name.endsWith('.rz') ? extract(f) : compress(f)); }
 
 async function compress(f){
-  const row=addRow(f.name, 'compressing…');
+  const row=addRow(f.name, mode==='fast'?'compressing (fast)…':'racing codecs…');
   const buf=await f.arrayBuffer();
-  const r=await fetch('/pack',{method:'POST',body:buf});
+  const r=await fetch('/pack?mode='+mode,{method:'POST',body:buf});
   const blob=await r.blob();
   const codec=r.headers.get('X-Codec'), o=+r.headers.get('X-Orig'), p=+r.headers.get('X-Packed');
-  const ratio=(o/p).toFixed(2);
-  row.done(kb(o)+' → '+kb(p)+'  ·  '+ratio+'x', codec, blob, f.name+'.rz');
+  const results=JSON.parse(r.headers.get('X-Results')||'[]');
+  row.done(kb(o)+' → '+kb(p)+'  ·  '+(o/p).toFixed(2)+'x', codec, blob, f.name+'.rz', results, o);
 }
 async function extract(f){
   const row=addRow(f.name, 'extracting…');
@@ -81,10 +98,21 @@ function addRow(name, status){
   el.innerHTML='<div class="nm">'+name+'</div><div class="meta spin">'+status+'</div>';
   list.prepend(el);
   return {
-    done(meta,tag,blob,dlname){
+    done(meta,tag,blob,dlname,results,orig){
       const url=URL.createObjectURL(blob);
-      el.innerHTML='<div class="nm">'+name+'</div><span class="tag">'+tag+'</span>'
-        +'<div class="meta">'+meta+'</div><a class="dl" href="'+url+'" download="'+dlname+'">Save</a>';
+      let tourney='';
+      if(results&&results.length){
+        const max=Math.max(...results.map(r=>r.len)), win=Math.min(...results.map(r=>r.len));
+        tourney='<div class="tourney">'+results.sort((a,b)=>a.len-b.len).map(r=>
+          '<div class="cn '+(r.len===win?'win':'')+'">'+r.name+'</div>'
+          +'<div class="bar '+(r.len===win?'win':'')+'"><div class="fill" style="width:'+(100*r.len/max).toFixed(0)+'%"></div></div>'
+          +'<div class="sz '+(r.len===win?'win':'')+'">'+kb(r.len)+(orig?' · '+(orig/r.len).toFixed(2)+'x':'')+'</div>'
+        ).join('')+'</div>';
+      }
+      el.innerHTML='<div style="display:flex;align-items:center;gap:14px;width:100%">'
+        +'<div class="nm">'+name+'</div><span class="tag">'+tag+'</span>'
+        +'<div class="meta">'+meta+'</div><a class="dl" href="'+url+'" download="'+dlname+'">Save</a></div>'+tourney;
+      el.style.flexDirection='column'; el.style.alignItems='stretch';
     },
     fail(msg){ el.querySelector('.meta').textContent='error: '+msg; }
   };
@@ -95,9 +123,14 @@ http.createServer((req, res) => {
   const p = req.url.split('?')[0];
   if (req.method === 'GET' && p === '/') { res.setHeader('Content-Type', 'text/html'); res.end(HTML); return; }
   if (req.method === 'POST' && p === '/pack') {
+    const fast = /(?:\?|&)mode=fast/.test(req.url);
     readBody(req, (buf) => {
-      try { const r = pack(buf); res.setHeader('X-Codec', r.name); res.setHeader('X-Orig', buf.length); res.setHeader('X-Packed', r.bytes.length); res.setHeader('Content-Type', 'application/octet-stream'); res.end(r.bytes); }
-      catch (e) { res.statusCode = 500; res.end(String(e.message)); }
+      try {
+        const r = pack(buf, fast ? { only: FAST } : {});
+        res.setHeader('X-Codec', r.name); res.setHeader('X-Orig', buf.length); res.setHeader('X-Packed', r.bytes.length);
+        res.setHeader('X-Results', JSON.stringify(r.all));
+        res.setHeader('Content-Type', 'application/octet-stream'); res.end(r.bytes);
+      } catch (e) { res.statusCode = 500; res.end(String(e.message)); }
     }); return;
   }
   if (req.method === 'POST' && p === '/unpack') {
