@@ -30,16 +30,15 @@ number,word
   ```
 
 ## Why this is hallucination-proof
-It is **built by a script, not an LLM.** The number is a counted position — there is
-no model guessing, so it is impossible to hallucinate a wrong entry. This is the right
-tool for the job: LLMs (local or paid) must never enumerate or number 370k items — they
-*will* invent entries. Numbering is arithmetic; arithmetic is code.
+It is **built by a script**, not generated. The number is a counted position, so a wrong
+entry is impossible by construction. Nothing is guessed at any point: enumerating and
+numbering 370k items is arithmetic, and arithmetic belongs in code.
 
 ## Honest note on usefulness
 This alphabetical numbering is **stable and shareable** but is **not** a compression win
 on its own (common short words get large numbers — `hello` = 135730). To make the
 dictionary useful for *shrinking* data, re-rank it by **word frequency** (`the` = 1,
 `of` = 2 …) so common words get small numbers — see [`STRATEGY.md`](STRATEGY.md). That
-re-ranking is also a script (from a frequency corpus), not an LLM task.
+re-ranking is also a script, driven by a real frequency corpus.
 
 MIT / public-domain source. Use freely.

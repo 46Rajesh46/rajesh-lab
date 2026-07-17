@@ -18,14 +18,14 @@ Why it got bigger: on the alphabetical dwyl list **hello = 135730** (6 digits) f
 
 ## The real name for your idea
 Assigning short codes to frequent tokens is **entropy coding** — Huffman (1952) and
-arithmetic coding. It's exactly what **gzip, zstd, brotli** and **LLM tokenizers
+arithmetic coding. It's exactly what **gzip, zstd, brotli** and modern **subword tokenizers
 (BPE)** already do. You reinvented a real, powerful idea. To make it *win*, two fixes:
 
 ### Fix 1 — rank the dictionary by FREQUENCY, not spelling
 `the`, `of`, `and` → 1, 2, 3… ; `hello` ≈ rank 100 (3 digits, not 6). Only then do
 common words get short codes. Frequency comes from a real corpus — **google-10000-english**,
-**Google Books n-grams**, or the `wordfreq` dataset. **Not from an LLM/Ollama** — an
-LLM can't reliably enumerate or rank 370k words and would hallucinate. Numbering a
+**Google Books n-grams**, or the `wordfreq` dataset. **Not guessed** — nothing can
+reliably enumerate or rank 370k words from memory without inventing entries. Numbering a
 word list is a 3-line deterministic script (that's `demo.js`), not an AI job.
 
 ### Fix 2 — variable-length codes over TOKENS, not decimal digits

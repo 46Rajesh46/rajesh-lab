@@ -13,7 +13,7 @@ workspace). Runs with **no new software** — only Node.js.
    (full HTML + built-in dark CSS), `route`, `api`, `on post` (+`body`), `let`,
    `show` (HTML out), `give` (JSON out), `redirect`, one-line forms
    (`route "/" show "Hello"`), and a bare-line JS escape hatch. POST bodies
-   parsed (JSON + form), 1MB cap, 400/413/500 handled. MIT licensed to Rajesh.
+   parsed (JSON + form), 1MB cap, 400/413/500 handled. MIT licensed to Rajesh J.
    - Run: `node realscript/realc.js realscript/examples/guestbook.real` → http://localhost:3000
    - Test: `node realscript/realc.js --selftest`
    - Full CRUD demo (form → store → redirect → list → JSON API) = `examples/guestbook.real`.
@@ -26,8 +26,8 @@ workspace). Runs with **no new software** — only Node.js.
 ## Design principles (the "why")
 - A high-level language wins by **hiding boilerplate**: one keyword expands into
   many lines. Same trick Python uses (`print()` vs Java's ceremony).
-- **Token savings come from the SOURCE Claude writes, not the compiled output.**
-  Compiled code expands (and is never read by an LLM) — its size is irrelevant.
+- **Token savings come from the SOURCE that gets written, not the compiled output.**
+  Compiled code expands (and is never read back) — its size is irrelevant.
 - Optimize for **predictable, readable syntax** so an AI generates it reliably.
   There's a real tradeoff: ultra-tiny/cryptic syntax = fewer tokens but LESS
   reliable generation. Readable keywords that each do a lot = the sweet spot.

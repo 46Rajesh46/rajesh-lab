@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // RealScript v0.2 — a tiny full-stack web language that transpiles to JavaScript.
-// (c) 2026 Rajesh — MIT License.
+// (c) 2026 Rajesh J — MIT License.
 //
 //   node realc.js app.real            compile + run the web server
 //   node realc.js app.real --build    emit app.real.js instead of running

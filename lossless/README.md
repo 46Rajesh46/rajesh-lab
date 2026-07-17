@@ -51,7 +51,7 @@ smallest (and falls back to `store` when data won't compress).
 - `bench.js` — the market benchmark
 - `demo.js` — gzip/brotli zero-loss round-trip demo
 - `FORMAT.md` — the `.rz` format spec: exactly how to restore any archive
-- `STRATEGY.md` / `BEST-STRATEGY.md` — the compression strategy (synthesized from 12 local models + measured)
+- `STRATEGY.md` / `BEST-STRATEGY.md` — the compression strategy (researched + measured)
 
 ## What would make it beat the market outright
 - A **neural predictor** (bundled small model, run deterministically) → the ratio frontier

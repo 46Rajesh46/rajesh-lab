@@ -1,5 +1,5 @@
 // archive.js — multi-file .rz archives (the 7-Zip "many files in one" feature).
-// Layout (designed with GLM-5.2): [file blobs][central directory][16-byte EOCD].
+// Layout: [file blobs][central directory][16-byte EOCD] — ZIP-style, so listing is cheap.
 // Each blob = router.pack output (self-describing: starts with a codec tag), so the
 // central directory lets you LIST or extract ONE file without touching the rest.
 'use strict';

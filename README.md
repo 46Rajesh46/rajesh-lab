@@ -1,7 +1,7 @@
 # Rajesh Lab
 
 Inventing my own programming languages, exploring quantum computing, and a
-straight-talking plan for records and recognition. Created by **Rajesh**.
+straight-talking plan for records and recognition. Created by **Rajesh J**.
 Runs with **no new software** — only Node (already on this PC via Laragon).
 
 - 🌐 **RealScript** — a full-stack web language in one dependency-free file: **9,345 bytes**
@@ -21,7 +21,7 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 | [`quantum/qscript.js`](quantum/qscript.js) | **QScript** — my quantum language (`qubits/h/x/z/cnot/measure`) on `qsim.js`. | working ✅ |
 | [`quantum/qsim.js`](quantum/qsim.js) | Pure-JS quantum simulator — runs a real entangled Bell state. | working ✅ |
 | [`lossless/`](lossless/) | **rz** — try-all lossless compressor + our `lpaq` context-mixing coder (beats gzip/brotli/xz on text). Installable CLI + benchmark. | working ✅ |
-| [`compress/`](compress/) | The **number dictionary** (370k words ↔ numbers) + the honest compression strategy synthesized from 12 local AI models. | published |
+| [`compress/`](compress/) | The **number dictionary** (370k words ↔ numbers) + the honest, measured compression strategy. | published |
 | [`records/SMALLEST-CLAIM.md`](records/SMALLEST-CLAIM.md) | The "smallest full-stack language" claim + how anyone re-measures it. | published |
 | [`records/GUINNESS-APPLICATION.md`](records/GUINNESS-APPLICATION.md) | The timed-feat application package for an actual Guinness certificate. | ready to submit |
 | [`AMBITION-ROADMAP.md`](AMBITION-ROADMAP.md) | The honest records/recognition plan. | plan |
@@ -94,4 +94,4 @@ Full package: [`records/GUINNESS-APPLICATION.md`](records/GUINNESS-APPLICATION.m
 - **Quantum is free to start:** IBM Quantum gives free access to *real* quantum computers online; this laptop simulates small ones.
 
 ## License
-MIT © Rajesh
+MIT © Rajesh J

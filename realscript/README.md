@@ -1,6 +1,6 @@
 # RealScript
 
-A tiny, readable web language — created by **Rajesh**. You write `.real` files;
+A tiny, readable web language — created by **Rajesh J**. You write `.real` files;
 RealScript transpiles them to JavaScript and runs a real HTTP server. No
 framework, no dependencies, just Node.
 

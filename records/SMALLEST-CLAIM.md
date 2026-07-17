@@ -1,6 +1,6 @@
 # RealScript — "world's smallest full-stack web language" claim
 
-**Author:** Rajesh · **License:** MIT · **Language:** RealScript v0.2
+**Author:** Rajesh J · **License:** MIT · **Language:** RealScript v0.2
 
 ## The claim
 > RealScript is a **complete full-stack web language** — HTTP server, routing,
