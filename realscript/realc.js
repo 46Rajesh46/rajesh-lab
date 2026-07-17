@@ -8,7 +8,9 @@
 //
 // Statements:
 //   serve on 3000                     set the port
-//   store users                       a persistent JSON-backed collection (users.add(x))
+//   store users                       a persistent JSON-backed collection:
+//                                     users.add(x) append+save · users.save() persist edits/deletes
+//                                     (full CRUD: add / read / mutate+save / splice+save)
 //   page "/x" title "Home" do ... end  a full HTML page (built-in styling); `show` appends body
 //   route "/x" do ... end             raw handler; `show` sends the whole response
 //   api "/x" do ... end               JSON handler (GET); `give` sends JSON
@@ -16,6 +18,7 @@
 //   let name = expr                   a variable
 //   show expr                         HTML out      | give expr   JSON out
 //   redirect expr                     302 redirect  | <bare expr>  runs as JS (e.g. users.add(...))
+//   esc(x)                            escape user text before showing it (prevents XSS)
 
 'use strict';
 const assert = (cond, msg) => { if (!cond) throw new Error('FAIL: ' + msg); };
@@ -108,9 +111,12 @@ function compile(src) {
   let out = "const http = require('http');\nconst fs = require('fs');\nconst path = require('path');\n";
   out += 'const BASE_CSS = ' + JSON.stringify(BASE_CSS) + ';\n';
   out += 'function htmlDoc(title, body){ return \'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>\' + title + \'</title><style>\' + BASE_CSS + \'</style></head><body><main>\' + body + \'</main></body></html>\'; }\n';
+  // esc(x) — escape user text before putting it in HTML. Without this, any app that
+  // shows what a user typed is a stored-XSS hole. ponytail: one helper, every app safe.
+  out += 'function esc(s){ return String(s).replace(/[&<>"\']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","\'":"&#39;"})[c]); }\n';
   // tiny persistent store: db("users") -> array with a non-enumerable .add()
   // ponytail: whole file rewritten per add — fine at low volume; swap for a real DB if it grows.
-  out += 'const _stores = {};\nfunction db(name){ if(_stores[name]) return _stores[name]; const file = path.join(__dirname, name + ".json"); let arr = []; try { arr = JSON.parse(fs.readFileSync(file, "utf8")); } catch(e){} Object.defineProperty(arr, "add", { value: (item) => { arr.push(item); fs.writeFileSync(file, JSON.stringify(arr, null, 2)); return item; } }); _stores[name] = arr; return arr; }\n';
+  out += 'const _stores = {};\nfunction db(name){ if(_stores[name]) return _stores[name]; const file = path.join(__dirname, name + ".json"); let arr = []; try { arr = JSON.parse(fs.readFileSync(file, "utf8")); } catch(e){} const save = () => { fs.writeFileSync(file, JSON.stringify(arr, null, 2)); return arr; }; Object.defineProperty(arr, "save", { value: save }); Object.defineProperty(arr, "add", { value: (item) => { arr.push(item); save(); return item; } }); _stores[name] = arr; return arr; }\n';
   for (const name of stores) out += 'const ' + name + ' = db(' + JSON.stringify(name) + ');\n';
 
   out += 'const table = {};\nfunction reg(p, m, fn){ (table[p] || (table[p] = {}))[m] = fn; }\n';
@@ -157,6 +163,8 @@ function runSelfTest() {
 
   const pg = compile('store xs\npage "/" title "T" do\n  show "<b>hi</b>"\nend\n');
   assert(pg.includes('db("xs")'), 'store emitted');
+  assert(pg.includes('"save"'), 'stores expose save() for update/delete');
+  assert(pg.includes('function esc('), 'esc() helper emitted');
   assert(pg.includes('__parts.push(String("<b>hi</b>"))'), 'page show appends to body');
   assert(pg.includes('htmlDoc("T"'), 'page wraps in htmlDoc');
 

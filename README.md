@@ -4,7 +4,7 @@ Inventing my own programming languages, exploring quantum computing, and a
 straight-talking plan for records and recognition. Created by **Rajesh**.
 Runs with **no new software** — only Node (already on this PC via Laragon).
 
-- 🌐 **RealScript** — a full-stack web language in one dependency-free file: **8,968 bytes**
+- 🌐 **RealScript** — a full-stack web language in one dependency-free file: **9,345 bytes**
 - ⚛️ **QScript** — a readable quantum language on a pure-JS simulator
 - 🗜️ **rz** — a lossless compressor + our own `lpaq` coder that **beats gzip/brotli/xz on text**
 - 📖 **Number dictionary** — 370,105 words ↔ numbers, script-built, free for anyone
@@ -16,7 +16,8 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 
 | Folder / file | What it is | Status |
 |---|---|---|
-| [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, storage, JSON API. | working ✅ |
+| [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, **full CRUD** storage, JSON API, XSS-safe output. | working ✅ |
+| [`realscript/examples/taskboard.real`](realscript/examples/taskboard.real) | **RealTasks** — the flagship proof: a complete CRUD app (create/read/update/delete + JSON API + stats) in ~40 lines. | working ✅ |
 | [`quantum/qscript.js`](quantum/qscript.js) | **QScript** — my quantum language (`qubits/h/x/z/cnot/measure`) on `qsim.js`. | working ✅ |
 | [`quantum/qsim.js`](quantum/qsim.js) | Pure-JS quantum simulator — runs a real entangled Bell state. | working ✅ |
 | [`lossless/`](lossless/) | **rz** — try-all lossless compressor + our `lpaq` context-mixing coder (beats gzip/brotli/xz on text). Installable CLI + benchmark. | working ✅ |
@@ -28,8 +29,9 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 ## Run it (nothing to install)
 
 ```bash
-# RealScript — a full-stack web app, then open http://localhost:3000
-node realscript/realc.js realscript/examples/guestbook.real
+# RealScript — RealTasks: a full CRUD app in ~40 lines. Open http://localhost:3000
+node realscript/realc.js realscript/examples/taskboard.real
+node realscript/realc.js realscript/examples/guestbook.real   # simpler demo
 node realscript/realc.js --selftest                 # correctness tests
 
 # QScript — two qubits entangle (only 00/11 ever appear)
@@ -48,11 +50,11 @@ Full install guide: [`lossless/INSTALL.md`](lossless/INSTALL.md).
 
 > RealScript is a **complete full-stack web language** — server, routing, persistent
 > storage, HTML templating, forms, JSON API — in a **single zero-dependency file**
-> of **8,968 bytes / 136 lines** (readable reference: 11,512 B / 196 lines).
+> of **9,345 bytes / 139 lines** (readable reference: 12,339 B / 204 lines).
 
 ```bash
 node realscript/realc.js --selftest             # must print: selftest passed ✓
-wc -c realscript/realc.min.js                   # 8968  — the minimal compiler
+wc -c realscript/realc.min.js                   # 9345  — the minimal compiler
 grep -c "require('" realscript/realc.min.js     # 4 — all Node built-ins (http, fs, path)
 ```
 Details + reproducible rebuild: [`records/SMALLEST-CLAIM.md`](records/SMALLEST-CLAIM.md).

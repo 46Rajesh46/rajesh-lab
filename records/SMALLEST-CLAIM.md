@@ -5,8 +5,8 @@
 ## The claim
 > RealScript is a **complete full-stack web language** — HTTP server, routing,
 > persistent storage, HTML page templating, form handling, and a JSON API —
-> implemented in a **single dependency-free file** of **8,968 bytes / 136 lines**
-> (readable reference: 11,512 bytes / 196 lines). It transpiles to JavaScript and
+> implemented in a **single dependency-free file** of **9,345 bytes / 139 lines**
+> (readable reference: 12,339 bytes / 204 lines). It transpiles to JavaScript and
 > runs on Node.js with **zero third-party dependencies**.
 
 This is a **self-claimable, publicly verifiable** record (published + git-timestamped).
@@ -29,8 +29,8 @@ One `.real` file gives you all of this (see `realscript/examples/guestbook.real`
 ## The metric (measured, reproducible)
 ```
 node realscript/realc.js --selftest            # correctness gate — must print "selftest passed ✓"
-wc -c realscript/realc.min.js                  # 8968  — the minimal single-file compiler
-wc -c realscript/realc.js                      # 11512 — readable reference
+wc -c realscript/realc.min.js                  # 9345  — the minimal single-file compiler
+wc -c realscript/realc.js                      # 12339 — readable reference
 grep -c "require('" realscript/realc.min.js    # 4 — all Node built-ins (http, fs, path)
 ```
 `realc.min.js` is `realc.js` with only blank lines, comment-only lines, and
@@ -46,7 +46,15 @@ node -e "const fs=require('fs');const s=fs.readFileSync('realscript/realc.js','u
 1. `git clone <repo>` — commit timestamp = your authorship date.
 2. `node realscript/realc.js --selftest` → `selftest passed ✓`
 3. `node realscript/realc.js realscript/examples/guestbook.real` → open http://localhost:3000, sign the guestbook, hit `/api/entries`.
-4. `wc -c realscript/realc.min.js` → 8968.
+4. `wc -c realscript/realc.min.js` → 9345.
+
+## Changelog (the number moves — keep it honest)
+- **v0.2 → v0.3** (9,345 B, was 8,968 B): the language gained **real CRUD** — stores now
+  expose `save()` so apps can update and delete, not just append — and **`esc()`**, which
+  escapes user text before it's shown (without it, any app displaying user input was a
+  stored-XSS hole). The claim is "smallest **full-stack**"; a language that can't update or
+  delete, or that can't safely show user input, wasn't honestly full-stack. Proof:
+  [`realscript/examples/taskboard.real`](../realscript/examples/taskboard.real).
 
 ## Honest caveats
 - Not Guinness-sanctionable. This is a published, timestamped, verifiable claim — nothing more, nothing less.

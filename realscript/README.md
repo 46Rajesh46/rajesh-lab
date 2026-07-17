@@ -36,7 +36,8 @@ node realc.js examples/hello.real --build   # writes examples/hello.real.js
 | Statement                    | Meaning                                              |
 |------------------------------|------------------------------------------------------|
 | `serve on 3000`              | Set the port the server listens on.                  |
-| `store users`                | A **persistent** collection saved to `users.json`; `users.add(x)`. |
+| `store users`                | A **persistent** collection saved to `users.json`. `users.add(x)` appends+saves; `users.save()` persists edits/deletes → **full CRUD**. |
+| `esc(x)`                     | Escapes user text before you `show` it. Use it for anything a user typed — otherwise you've built an XSS hole. |
 | `page "/x" title "Home" do`  | A full **HTML page** with built-in styling; `show` appends to the body. |
 | `route "/x" do`              | A raw handler; `show` sends the whole response.      |
 | `api "/x" do`                | A **backend** JSON handler (GET).                    |
