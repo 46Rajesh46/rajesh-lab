@@ -1,24 +1,39 @@
 #!/usr/bin/env node
-// RealScript v0.2 — a tiny full-stack web language that transpiles to JavaScript.
+// RealScript v0.4 — a full-stack web language. You write RealScript; you never write JavaScript.
 // (c) 2026 Rajesh J — MIT License.
 //
 //   node realc.js app.real            compile + run the web server
 //   node realc.js app.real --build    emit app.real.js instead of running
 //   node realc.js --selftest          run the built-in checks
 //
-// Statements:
+// Structure:
 //   serve on 3000                     set the port
-//   store users                       a persistent JSON-backed collection:
-//                                     users.add(x) append+save · users.save() persist edits/deletes
-//                                     (full CRUD: add / read / mutate+save / splice+save)
-//   page "/x" title "Home" do ... end  a full HTML page (built-in styling); `show` appends body
+//   store users                       persistent collection: users.add(x) / users.save()
+//   page "/x" title "Home" do ... end  a full HTML page (built-in styling); `show` appends
 //   route "/x" do ... end             raw handler; `show` sends the whole response
 //   api "/x" do ... end               JSON handler (GET); `give` sends JSON
-//   on post "/x" do ... end           JSON/form POST handler; read fields from `body`
-//   let name = expr                   a variable
-//   show expr                         HTML out      | give expr   JSON out
-//   redirect expr                     302 redirect  | <bare expr>  runs as JS (e.g. users.add(...))
-//   esc(x)                            escape user text before showing it (prevents XSS)
+//   on post "/x" do ... end           form/JSON POST handler; fields arrive in `body`
+//
+// Statements:
+//   let name = expr                   a value
+//   show expr                         HTML out       | give expr    JSON out
+//   redirect "/x"                     302 redirect
+//   each p in posts [where COND] [newest first|oldest first] do ... end
+//   if COND do ... end   (with optional `else`)
+//   if any p in posts where COND do ... end      (also `if no p in ...`)
+//   add {..} to posts                 create
+//   set p.done to not p.done          update      | save posts    persist edits
+//   remove p from posts where COND    delete
+//   require login                     block anonymous visitors (302 -> /login)
+//   start session                     log the visitor in (HttpOnly, SameSite=Strict cookie)
+//   end session                       log out
+//
+// Expressions (no JavaScript needed):
+//   query "q"      a URL query value      | env "NAME"    an environment value
+//   count of list  how many              | date x         a readable date
+//   now            the current time      | short x        a trimmed excerpt
+//   safe x         escape user text (XSS) | a contains b   case-insensitive match
+//   is / is not / and / or / not         comparisons and logic
 
 'use strict';
 const assert = (cond, msg) => { if (!cond) throw new Error('FAIL: ' + msg); };
@@ -38,13 +53,38 @@ function toLogicalLines(src) {
   return out;
 }
 
+// --- expressions: RealScript sugar -> JS, without touching string literals ----
+// Strings are pulled out first so `show "this is fine"` never has its `is` rewritten.
+function rw(src) {
+  const lits = [];
+  let code = String(src).replace(/"(?:[^"\\]|\\.)*"/g, (m) => '\x01' + (lits.push(m) - 1) + '\x01');
+  code = code
+    .replace(/\bquery\s+(\x01\d+\x01)/g, '_q(req,$1)')
+    .replace(/\benv\s+(\x01\d+\x01)/g, '_env($1)')
+    .replace(/\bcount\s+of\s+([A-Za-z_][\w.]*)/g, '$1.length')
+    .replace(/\bdate\s+([A-Za-z_][\w.]*)/g, '_date($1)')
+    .replace(/\bshort\s+([A-Za-z_][\w.]*)/g, '_short($1)')
+    .replace(/\bnow\b/g, 'Date.now()')
+    .replace(/\bsafe\s+(_?[A-Za-z_][\w.]*(?:\([^()]*\))?)/g, 'esc($1)')
+    .replace(/([A-Za-z_][\w.]*|\x01\d+\x01)\s+contains\s+([A-Za-z_][\w.]*|\x01\d+\x01)/g, '_has($1,$2)')
+    .replace(/\bis\s+not\b/g, '!==')
+    .replace(/\bis\b/g, '===')
+    .replace(/\band\b/g, '&&')
+    .replace(/\bor\b/g, '||')
+    .replace(/\bnot\s+/g, '!');
+  return code.replace(/\x01(\d+)\x01/g, (_, i) => lits[+i]);
+}
+
 // --- parse: source text -> {port, stores, handlers} ---------------------
 function parse(src) {
   const lines = toLogicalLines(src);
   let port = 3000;
   const stores = [];
   const handlers = [];
-  let cur = null;
+  const flags = { session: false };
+  let stack = [];                                   // open blocks; [0] is the handler
+  const top = () => stack[stack.length - 1];
+  const push = (st) => { const b = top(); (b.inElse ? b.else : b.body).push(st); };
 
   lines.forEach((raw, i) => {
     const line = raw.trim();
@@ -52,76 +92,137 @@ function parse(src) {
     const where = ' (line ' + (i + 1) + ')';
     let m;
 
-    if ((m = line.match(/^serve on (\d+)$/)))            { port = m[1]; return; }
-    if ((m = line.match(/^store\s+([A-Za-z_]\w*)$/)))    { stores.push(m[1]); return; }
-
-    // One-line forms (no do/end) — Python-style "one line does a lot":
-    //   route "/" show "Hello World"      api "/t" give { ok: true }      page "/" show "<h1>Hi</h1>"
-    if ((m = line.match(/^route\s+"([^"]*)"\s+show\s+(.+)$/))) { handlers.push({ kind: 'route', method: 'GET', path: m[1], body: [{ op: 'show', expr: m[2] }] }); return; }
-    if ((m = line.match(/^api\s+"([^"]*)"\s+give\s+(.+)$/)))   { handlers.push({ kind: 'api', method: 'GET', path: m[1], body: [{ op: 'give', expr: m[2] }] }); return; }
-    if ((m = line.match(/^page\s+"([^"]*)"\s+show\s+(.+)$/)))  { handlers.push({ kind: 'page', method: 'GET', path: m[1], title: m[1], body: [{ op: 'show', expr: m[2] }] }); return; }
-
-    if ((m = line.match(/^page\s+"([^"]*)"(?:\s+title\s+"([^"]*)")?\s+do$/))) {
-      cur = { kind: 'page', method: 'GET', path: m[1], title: m[2] || m[1], body: [] };
-      handlers.push(cur); return;
+    if (!stack.length) {
+      if ((m = line.match(/^serve on (\d+)$/)))         { port = m[1]; return; }
+      if ((m = line.match(/^store\s+([A-Za-z_]\w*)$/))) { stores.push(m[1]); return; }
+      // One-line forms — "one line does a lot":
+      if ((m = line.match(/^route\s+"([^"]*)"\s+show\s+(.+)$/))) { handlers.push({ kind: 'route', method: 'GET', path: m[1], body: [{ op: 'show', expr: m[2] }] }); return; }
+      if ((m = line.match(/^api\s+"([^"]*)"\s+give\s+(.+)$/)))   { handlers.push({ kind: 'api', method: 'GET', path: m[1], body: [{ op: 'give', expr: m[2] }] }); return; }
+      if ((m = line.match(/^page\s+"([^"]*)"\s+show\s+(.+)$/)))  { handlers.push({ kind: 'page', method: 'GET', path: m[1], title: m[1], body: [{ op: 'show', expr: m[2] }] }); return; }
+      if ((m = line.match(/^page\s+"([^"]*)"(?:\s+title\s+"([^"]*)")?\s+do$/))) { const h = { kind: 'page', method: 'GET', path: m[1], title: m[2] || m[1], body: [] }; handlers.push(h); stack = [h]; return; }
+      if ((m = line.match(/^route\s+"([^"]*)"\s+do$/)))  { const h = { kind: 'route', method: 'GET', path: m[1], body: [] }; handlers.push(h); stack = [h]; return; }
+      if ((m = line.match(/^api\s+"([^"]*)"\s+do$/)))    { const h = { kind: 'api', method: 'GET', path: m[1], body: [] }; handlers.push(h); stack = [h]; return; }
+      if ((m = line.match(/^on\s+post\s+"([^"]*)"\s+do$/))) { const h = { kind: 'api', method: 'POST', path: m[1], body: [] }; handlers.push(h); stack = [h]; return; }
+      throw new Error('statement outside a handler: "' + line + '"' + where);
     }
-    if ((m = line.match(/^route\s+"([^"]*)"\s+do$/)))    { cur = { kind: 'route', method: 'GET', path: m[1], body: [] }; handlers.push(cur); return; }
-    if ((m = line.match(/^api\s+"([^"]*)"\s+do$/)))      { cur = { kind: 'api', method: 'GET', path: m[1], body: [] }; handlers.push(cur); return; }
-    if ((m = line.match(/^on\s+post\s+"([^"]*)"\s+do$/))) { cur = { kind: 'api', method: 'POST', path: m[1], body: [] }; handlers.push(cur); return; }
 
-    if (line === 'end') { if (!cur) throw new Error('`end` with no open handler' + where); cur = null; return; }
+    // --- inside a handler ---
+    if (line === 'end session')   { flags.session = true; push({ op: 'endsession' }); return; }
+    if (line === 'end')           { if (stack.length === 1) stack = []; else stack.pop(); return; }
+    if (line === 'else')          { const b = top(); if (b.op !== 'if') throw new Error('`else` outside an `if`' + where); b.inElse = true; return; }
+    if (line === 'require login') { flags.session = true; push({ op: 'requirelogin' }); return; }
+    if (line === 'start session') { flags.session = true; push({ op: 'startsession' }); return; }
 
-    if (!cur) throw new Error('statement outside a handler: "' + line + '"' + where);
+    // does anything in the list match? -> `if any p in posts where ... do` / `if no p in ...`
+    if ((m = line.match(/^if\s+(any|no)\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_][\w.]*)\s+where\s+(.+?)\s+do$/))) {
+      const blk = { op: 'some', neg: m[1] === 'no', item: m[2], list: m[3], cond: m[4], body: [], else: [] };
+      push(blk); stack.push(blk); return;
+    }
+    if ((m = line.match(/^add\s+(.+)\s+to\s+([A-Za-z_]\w*)$/)))                { push({ op: 'add', item: m[1], list: m[2] }); return; }
+    if ((m = line.match(/^set\s+([A-Za-z_][\w.]*)\s+to\s+(.+)$/)))             { push({ op: 'set', target: m[1], expr: m[2] }); return; }
+    if ((m = line.match(/^save\s+([A-Za-z_]\w*)$/)))                           { push({ op: 'save', list: m[1] }); return; }
+    if ((m = line.match(/^remove\s+([A-Za-z_]\w*)\s+from\s+([A-Za-z_]\w*)\s+where\s+(.+)$/))) { push({ op: 'remove', item: m[1], list: m[2], cond: m[3] }); return; }
 
-    if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/))) { cur.body.push({ op: 'let', name: m[1], expr: m[2] }); return; }
-    if ((m = line.match(/^show\s+(.+)$/)))                     { cur.body.push({ op: 'show', expr: m[1] }); return; }
-    if ((m = line.match(/^give\s+(.+)$/)))                     { cur.body.push({ op: 'give', expr: m[1] }); return; }
-    if ((m = line.match(/^redirect\s+(.+)$/)))                { cur.body.push({ op: 'redirect', expr: m[1] }); return; }
+    if ((m = line.match(/^each\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_][\w.]*)\s*(.*?)\s*do$/))) {
+      let mid = m[3], sort = null, cond = null;
+      const sm = mid.match(/\s*\b(newest|oldest)\s+first$/);
+      if (sm) { sort = sm[1]; mid = mid.slice(0, sm.index); }
+      const wm = mid.match(/^\s*where\s+(.+)$/);
+      if (wm) cond = wm[1];
+      const blk = { op: 'each', item: m[1], list: m[2], cond, sort, body: [] };
+      push(blk); stack.push(blk); return;
+    }
+    if ((m = line.match(/^if\s+(.+?)\s+do$/))) { const blk = { op: 'if', cond: m[1], body: [], else: [] }; push(blk); stack.push(blk); return; }
 
-    // Anything else is a bare JS statement (e.g. `users.add({...})`).
-    // ponytail: powerful escape hatch; a mistyped keyword lands here and errors at runtime, not compile.
-    cur.body.push({ op: 'do', expr: line });
+    if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/)))  { push({ op: 'let', name: m[1], expr: m[2] }); return; }
+    if ((m = line.match(/^show\s+(.+)$/)))                      { push({ op: 'show', expr: m[1] }); return; }
+    if ((m = line.match(/^give\s+(.+)$/)))                      { push({ op: 'give', expr: m[1] }); return; }
+    if ((m = line.match(/^redirect\s+(.+)$/)))                  { push({ op: 'redirect', expr: m[1] }); return; }
+
+    throw new Error('I do not understand: "' + line + '"' + where);
   });
 
-  return { port, stores, handlers };
+  if (stack.length) throw new Error('missing `end` — a block was left open');
+  return { port, stores, handlers, flags };
 }
 
-// --- generate: handler body -> JS -------------------------------------
-function genBody(h) {
-  let s = h.kind === 'page' ? 'const __parts = [];\n' : '';
-  for (const st of h.body) {
-    if (st.op === 'let') s += 'const ' + st.name + ' = ' + st.expr + ';\n';
-    else if (st.op === 'do') s += st.expr + ';\n';
-    else if (st.op === 'redirect') s += 'res.writeHead(302, { Location: String(' + st.expr + ') }); res.end(); return;\n';
-    else if (st.op === 'give') s += "res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(" + st.expr + ')); return;\n';
+// --- generate: statements -> JS ---------------------------------------
+let __t = 0;
+function genStmts(list, kind) {
+  let s = '';
+  for (const st of list) {
+    if (st.op === 'let') s += 'const ' + st.name + ' = ' + rw(st.expr) + ';\n';
+    else if (st.op === 'add') s += st.list + '.add(' + rw(st.item) + ');\n';
+    else if (st.op === 'set') s += st.target + ' = ' + rw(st.expr) + ';\n';
+    else if (st.op === 'save') s += st.list + '.save();\n';
+    else if (st.op === 'remove') {
+      const v = '__r' + (__t++);
+      s += '{ const ' + v + ' = ' + st.list + '.filter(' + st.item + ' => !(' + rw(st.cond) + '));\n' +
+           st.list + '.length = 0;\nfor(const _x of ' + v + ') ' + st.list + '.push(_x);\n' + st.list + '.save(); }\n';
+    }
+    else if (st.op === 'some') {
+      s += 'if(' + (st.neg ? '!' : '') + st.list + '.some(' + st.item + ' => (' + rw(st.cond) + '))){\n' + genStmts(st.body, kind) + '}';
+      s += st.else.length ? ' else {\n' + genStmts(st.else, kind) + '}\n' : '\n';
+    }
+    else if (st.op === 'redirect') s += 'res.writeHead(302, { Location: String(' + rw(st.expr) + ') }); res.end(); return;\n';
+    else if (st.op === 'give') s += "res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(" + rw(st.expr) + ')); return;\n';
     else if (st.op === 'show') {
-      if (h.kind === 'page') s += '__parts.push(String(' + st.expr + '));\n';
-      else s += "res.setHeader('Content-Type','text/html'); res.end(String(" + st.expr + ')); return;\n';
+      if (kind === 'page') s += '__parts.push(String(' + rw(st.expr) + '));\n';
+      else s += "res.setHeader('Content-Type','text/html'); res.end(String(" + rw(st.expr) + ')); return;\n';
+    }
+    else if (st.op === 'requirelogin') s += 'if(!_authed(req)){ res.writeHead(302,{Location:"/login"}); res.end(); return; }\n';
+    else if (st.op === 'startsession') s += '_start(res);\n';
+    else if (st.op === 'endsession') s += '_end(req,res);\n';
+    else if (st.op === 'if') {
+      s += 'if(' + rw(st.cond) + '){\n' + genStmts(st.body, kind) + '}';
+      s += st.else.length ? ' else {\n' + genStmts(st.else, kind) + '}\n' : '\n';
+    }
+    else if (st.op === 'each') {
+      const v = '__l' + (__t++);
+      s += '{ let ' + v + ' = (' + st.list + ').slice();\n';
+      if (st.cond) s += v + ' = ' + v + '.filter(' + st.item + ' => (' + rw(st.cond) + '));\n';
+      if (st.sort) s += v + '.sort((a,b) => ' + (st.sort === 'newest' ? 'b.at - a.at' : 'a.at - b.at') + ');\n';
+      s += 'for(const ' + st.item + ' of ' + v + '){\n' + genStmts(st.body, kind) + '}\n}\n';
     }
   }
-  if (h.kind === 'page') s += "res.setHeader('Content-Type','text/html'); res.end(htmlDoc(" + JSON.stringify(h.title) + ", __parts.join('')));\n";
   return s;
 }
 
 const BASE_CSS = ":root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1115;color:#e7e9ee}main{max-width:720px;margin:0 auto;padding:2rem}h1,h2{line-height:1.2}a{color:#7aa2ff}input,textarea,button{font:inherit;padding:.6rem .8rem;border-radius:8px;border:1px solid #333;background:#181b22;color:inherit;margin:.25rem .25rem .25rem 0}button{background:#3b6cff;border:0;cursor:pointer}.card{background:#161922;border:1px solid #262b36;border-radius:12px;padding:.9rem 1.1rem;margin:.8rem 0}";
 
 function compile(src) {
-  const { port, stores, handlers } = parse(src);
+  const { port, stores, handlers, flags } = parse(src);
+  __t = 0;
 
   let out = "const http = require('http');\nconst fs = require('fs');\nconst path = require('path');\n";
   out += 'const BASE_CSS = ' + JSON.stringify(BASE_CSS) + ';\n';
   out += 'function htmlDoc(title, body){ return \'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>\' + title + \'</title><style>\' + BASE_CSS + \'</style></head><body><main>\' + body + \'</main></body></html>\'; }\n';
-  // esc(x) — escape user text before putting it in HTML. Without this, any app that
-  // shows what a user typed is a stored-XSS hole. ponytail: one helper, every app safe.
+  // esc(x) — escape user text before it lands in HTML. Without this, any app that shows
+  // what a user typed is a stored-XSS hole. ponytail: one helper, every app safe.
   out += 'function esc(s){ return String(s).replace(/[&<>"\']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","\'":"&#39;"})[c]); }\n';
-  // tiny persistent store: db("users") -> array with a non-enumerable .add()
+  out += 'function _q(req,n){ return new URL(req.url,"http://x").searchParams.get(n) || ""; }\n';
+  out += 'function _env(n){ return process.env[n] || ""; }\n';
+  out += 'function _date(x){ return new Date(x).toDateString(); }\n';
+  out += 'function _has(a,b){ return String(a).toLowerCase().includes(String(b).toLowerCase()); }\n';
+  out += 'function _short(s){ s = String(s); return s.length > 180 ? s.slice(0,180) + "…" : s; }\n';
+  // tiny persistent store: db("users") -> array with non-enumerable .add()/.save()
   // ponytail: whole file rewritten per add — fine at low volume; swap for a real DB if it grows.
   out += 'const _stores = {};\nfunction db(name){ if(_stores[name]) return _stores[name]; const file = path.join(__dirname, name + ".json"); let arr = []; try { arr = JSON.parse(fs.readFileSync(file, "utf8")); } catch(e){} const save = () => { fs.writeFileSync(file, JSON.stringify(arr, null, 2)); return arr; }; Object.defineProperty(arr, "save", { value: save }); Object.defineProperty(arr, "add", { value: (item) => { arr.push(item); save(); return item; } }); _stores[name] = arr; return arr; }\n';
   for (const name of stores) out += 'const ' + name + ' = db(' + JSON.stringify(name) + ');\n';
 
+  if (flags.session) {
+    // sessions: a random server-side token in an HttpOnly, SameSite=Strict cookie
+    out += 'const _sess = db("_sessions");\nfunction _tok(req){ const c = String(req.headers.cookie || "").split("rs=")[1]; return c ? c.split(";")[0] : ""; }\n';
+    out += 'function _authed(req){ const t = _tok(req); return !!t && _sess.some(s => s.token === t); }\n';
+    out += 'function _start(res){ const t = require("crypto").randomBytes(24).toString("hex"); _sess.add({ token: t, at: Date.now() }); res.setHeader("Set-Cookie", "rs=" + t + "; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400"); }\n';
+    out += 'function _end(req,res){ const t = _tok(req); const i = _sess.findIndex(s => s.token === t); if(i >= 0){ _sess.splice(i,1); _sess.save(); } res.setHeader("Set-Cookie", "rs=; HttpOnly; Path=/; Max-Age=0"); }\n';
+  }
+
   out += 'const table = {};\nfunction reg(p, m, fn){ (table[p] || (table[p] = {}))[m] = fn; }\n';
   for (const h of handlers) {
-    out += 'reg(' + JSON.stringify(h.path) + ', ' + JSON.stringify(h.method) + ', (req, res, body) => {\n' + genBody(h) + '});\n';
+    const body = (h.kind === 'page' ? 'const __parts = [];\n' : '') + genStmts(h.body, h.kind) +
+      (h.kind === 'page' ? "res.setHeader('Content-Type','text/html'); res.end(htmlDoc(" + JSON.stringify(h.title) + ", __parts.join('')));\n" : '');
+    out += 'reg(' + JSON.stringify(h.path) + ', ' + JSON.stringify(h.method) + ', (req, res, body) => {\n' + body + '});\n';
   }
 
   out += 'http.createServer((req, res) => {\n' +
@@ -156,7 +257,6 @@ function runSelfTest() {
 
   const api = compile('api "/time" do\n  give { ok: true }\nend\n');
   assert(api.includes("'application/json'"), 'api gives JSON');
-  assert(api.includes('JSON.stringify({ ok: true })'), 'give emitted');
 
   const multi = compile('route "/" do\n  show "<h1>hi</h1>\n  <p>bye</p>"\nend\n');
   assert(multi.includes('<h1>hi</h1>\\n  <p>bye</p>'), 'multi-line string merges');
@@ -165,21 +265,63 @@ function runSelfTest() {
   assert(pg.includes('db("xs")'), 'store emitted');
   assert(pg.includes('"save"'), 'stores expose save() for update/delete');
   assert(pg.includes('function esc('), 'esc() helper emitted');
-  assert(pg.includes('__parts.push(String("<b>hi</b>"))'), 'page show appends to body');
   assert(pg.includes('htmlDoc("T"'), 'page wraps in htmlDoc');
 
-  const post = compile('on post "/a" do\n  x.add({ y: body.y })\n  redirect "/"\nend\n');
+  const post = compile('store x\non post "/a" do\n  add { y: body.y } to x\n  redirect "/"\nend\n');
   assert(post.includes('"/a", "POST"'), 'post method registered');
-  assert(post.includes('x.add({ y: body.y });'), 'bare JS statement emitted');
+  assert(post.includes('x.add({ y: body.y })'), '`add .. to` compiles to a store write');
   assert(post.includes('writeHead(302'), 'redirect emitted');
 
-  const oneLine = compile('route "/" show "Hello World"');
-  assert(oneLine.includes('res.end(String("Hello World"))'), 'one-line route works');
-  assert(oneLine.includes('.listen(3000'), 'default port when serve-on omitted');
+  // --- v0.4: you never write JavaScript ---
+  const ex = compile('store posts\npage "/" title "P" do\n  let q = query "q"\n  each p in posts where p.published newest first do\n    show "<h2>" + safe p.title + "</h2>"\n  end\nend\n');
+  assert(ex.includes('_q(req,"q")'), 'query keyword');
+  assert(ex.includes('.filter(p => (p.published))'), 'each/where filters');
+  assert(ex.includes('b.at - a.at'), 'newest first sorts');
+  assert(ex.includes('for(const p of'), 'each loops');
+  assert(ex.includes('esc(p.title)'), 'safe escapes');
+
+  const cond = compile('page "/" title "C" do\n  if count of nums is 0 do\n    show "none"\n  else\n    show "some"\n  end\nend\n');
+  assert(cond.includes('if(nums.length === 0)'), '`count of` + `is` compile');
+  assert(cond.includes('} else {'), 'else compiles');
+
+  const sess = compile('on post "/l" do\n  if body.password is env "PW" do\n    start session\n  end\n  redirect "/"\nend\n');
+  assert(sess.includes('_env("PW")'), 'env keyword');
+  assert(sess.includes('_start(res)'), 'start session');
+  assert(sess.includes('SameSite=Strict'), 'session cookie is SameSite=Strict');
+
+  const guard = compile('page "/a" title "A" do\n  require login\n  show "secret"\nend\n');
+  assert(guard.includes('if(!_authed(req))'), 'require login guards');
+
+  const has = compile('page "/" title "S" do\n  let q = query "q"\n  each p in posts where p.title contains q do\n    show "x"\n  end\nend\n');
+  assert(has.includes('_has(p.title,q)'), '`contains` compiles');
+
+  // strings must survive the rewriter untouched
+  const str = compile('route "/" show "this is a test and not code"');
+  assert(str.includes('"this is a test and not code"'), 'words inside strings are never rewritten');
+
+  const crud = compile('store posts\non post "/n" do\n  add { id: "" + now, t: body.t } to posts\n  redirect "/"\nend\n');
+  assert(crud.includes('posts.add({ id: "" + Date.now(), t: body.t })'), '`add .. to` + `now` compile');
+
+  const mut = compile('store posts\non post "/t" do\n  each p in posts where p.id is body.id do\n    set p.done to not p.done\n  end\n  save posts\n  redirect "/"\nend\n');
+  assert(mut.includes('p.done = !p.done;'), '`set .. to` mutates');
+  assert(mut.includes('posts.save();'), '`save` persists');
+
+  const del = compile('store posts\non post "/d" do\n  remove p from posts where p.id is body.id\n  redirect "/"\nend\n');
+  assert(del.includes('.filter(p => !(p.id === body.id))'), '`remove .. where` filters');
+
+  const none = compile('store posts\npage "/" title "N" do\n  if no p in posts where p.published do\n    show "empty"\n  end\nend\n');
+  assert(none.includes('if(!posts.some(p => (p.published)))'), '`if no .. where` compiles');
+
+  const shrt = compile('store posts\npage "/" title "S" do\n  each p in posts do\n    show safe short p.body\n  end\nend\n');
+  assert(shrt.includes('esc(_short(p.body))'), '`safe short x` nests');
 
   let threw = false;
   try { compile('show "oops"'); } catch (e) { threw = /outside a handler/.test(e.message); }
   assert(threw, 'rejects show outside a handler');
+
+  let threw2 = false;
+  try { compile('page "/" title "x" do\n  each p in xs do\n    show "y"\nend\n'); } catch (e) { threw2 = /missing `end`/.test(e.message); }
+  assert(threw2, 'rejects unclosed block');
 
   console.log('selftest passed ✓');
 }

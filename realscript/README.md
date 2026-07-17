@@ -1,5 +1,8 @@
 # RealScript
 
+**You never write JavaScript.** Every part of a website — routing, templating, forms,
+CRUD storage, login sessions, search, JSON APIs — is a RealScript keyword.
+
 A tiny, readable web language — created by **Rajesh J**. You write `.real` files;
 RealScript transpiles them to JavaScript and runs a real HTTP server. No
 framework, no dependencies, just Node.
@@ -43,6 +46,18 @@ node realc.js examples/hello.real --build   # writes examples/hello.real.js
 | `serve on 3000`              | Set the port the server listens on.                  |
 | `store users`                | A **persistent** collection saved to `users.json`. `users.add(x)` appends+saves; `users.save()` persists edits/deletes → **full CRUD**. |
 | `esc(x)`                     | Escapes user text before you `show` it. Use it for anything a user typed — otherwise you've built an XSS hole. |
+| `each p in posts where COND newest first do … end` | Loop, filter and sort a store — no `.map/.filter/.sort`. |
+| `if COND do … else … end`    | A branch. `if any p in posts where …` / `if no p in …` test existence. |
+| `add {..} to posts`          | Create. |
+| `set p.done to not p.done`   | Update a field. `save posts` persists it. |
+| `remove p from posts where COND` | Delete. |
+| `require login`              | Block anonymous visitors (302 → /login). |
+| `start session` / `end session` | Log in / out — random server-side token, HttpOnly + SameSite=Strict cookie. |
+| `query "q"` / `env "NAME"`  | A URL query value / an environment value. |
+| `count of xs` · `date x` · `now` · `short x` | How many · a readable date · the current time · a trimmed excerpt. |
+| `safe x`                     | Escape user text before showing it (prevents XSS). |
+| `a contains b`               | Case-insensitive match (search). |
+| `is` · `is not` · `and` · `or` · `not` | Comparisons and logic. |
 | `page "/x" title "Home" do`  | A full **HTML page** with built-in styling; `show` appends to the body. |
 | `route "/x" do`              | A raw handler; `show` sends the whole response.      |
 | `api "/x" do`                | A **backend** JSON handler (GET).                    |

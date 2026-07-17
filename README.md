@@ -4,7 +4,7 @@ Inventing my own programming languages, exploring quantum computing, and a
 straight-talking plan for records and recognition. Created by **Rajesh J**.
 Runs with **no new software** — only Node (already on this PC via Laragon).
 
-- 🌐 **RealScript** — a full-stack web language in one dependency-free file: **9,345 bytes**
+- 🌐 **RealScript** — a full-stack web language where **you never write JavaScript**. One dependency-free file: **17,603 bytes**
 - ⚛️ **QScript** — a readable quantum language on a pure-JS simulator
 - 🗜️ **rz** — a lossless compressor + our own `lpaq` coder that **beats gzip/brotli/xz on text**
 - 📖 **Number dictionary** — 370,105 words ↔ numbers, script-built, free for anyone
@@ -17,7 +17,7 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 | Folder / file | What it is | Status |
 |---|---|---|
 | [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, **full CRUD** storage, sessions/auth, JSON API, XSS-safe output. | working ✅ |
-| [`realscript/examples/realblog.real`](realscript/examples/realblog.real) | **RealBlog** — the flagship proof: a real, functional **website** in ~110 lines. Feed, full-text search, single-post pages, **admin login with server-side sessions**, publish/draft/delete, JSON API. | working ✅ |
+| [`realscript/examples/realblog.real`](realscript/examples/realblog.real) | **RealBlog** — the flagship proof: a real **website with zero JavaScript in its source**. Feed, full-text search, post pages, **admin login with server-side sessions**, publish/draft/delete, JSON API. | working ✅ |
 | [`realscript/examples/taskboard.real`](realscript/examples/taskboard.real) | **RealTasks** — a complete CRUD app (create/read/update/delete + JSON API + stats) in ~40 lines. | working ✅ |
 | [`quantum/qscript.js`](quantum/qscript.js) | **QScript** — my quantum language (`qubits/h/x/z/cnot/measure`) on `qsim.js`. | working ✅ |
 | [`quantum/qsim.js`](quantum/qsim.js) | Pure-JS quantum simulator — runs a real entangled Bell state. | working ✅ |
@@ -50,13 +50,16 @@ Full install guide: [`lossless/INSTALL.md`](lossless/INSTALL.md).
 
 ## The claim, and how to verify it yourself (2 minutes, Node only)
 
-> RealScript is a **complete full-stack web language** — server, routing, persistent
-> storage, HTML templating, forms, JSON API — in a **single zero-dependency file**
-> of **9,345 bytes / 139 lines** (readable reference: 12,339 B / 204 lines).
+> RealScript is a **full-stack web language in which you never write JavaScript** —
+> routing, templating, forms, CRUD storage, login sessions, search and a JSON API are
+> all keywords. A whole website's source contains **zero** JavaScript constructs.
+> The compiler is a **single zero-dependency file** of **17,603 bytes / 250 lines**
+> (readable reference: 21,916 B / 346 lines).
 
 ```bash
 node realscript/realc.js --selftest             # must print: selftest passed ✓
-wc -c realscript/realc.min.js                   # 9345  — the minimal compiler
+node tools/purity.js realscript/examples/realblog.real   # ZERO JavaScript constructs
+wc -c realscript/realc.min.js                   # 17603 — the whole compiler
 grep -c "require('" realscript/realc.min.js     # 4 — all Node built-ins (http, fs, path)
 ```
 Details + reproducible rebuild: [`records/SMALLEST-CLAIM.md`](records/SMALLEST-CLAIM.md).

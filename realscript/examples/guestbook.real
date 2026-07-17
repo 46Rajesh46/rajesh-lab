@@ -1,5 +1,5 @@
-# guestbook.real — a complete full-stack app in RealScript.
-# A styled page + a form + persistent storage + a JSON API. ~20 lines.
+# guestbook.real — a complete full-stack app in RealScript. ~20 lines, zero JavaScript.
+# A styled page + a form + persistent storage + a JSON API.
 # run:  node ..\realc.js guestbook.real
 
 serve on 3000
@@ -13,13 +13,15 @@ page "/" title "Guestbook" do
     <input name=msg placeholder='Say something'>
     <button>Sign</button>
   </form>"
-  show "<h2>" + entries.length + " signatures</h2>"
-  show entries.map(e => "<div class=card><b>" + e.name + "</b> — " + e.msg + "</div>").join('')
+  show "<h2>" + count of entries + " signatures</h2>"
+  each e in entries do
+    show "<div class=card><b>" + safe e.name + "</b> — " + safe e.msg + "</div>"
+  end
 end
 
 # --- BACKEND: receive the form, store it, redirect back ---
 on post "/add" do
-  entries.add({ name: body.name, msg: body.msg })
+  add { name: body.name, msg: body.msg } to entries
   redirect "/"
 end
 
