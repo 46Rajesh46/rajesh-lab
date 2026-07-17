@@ -1,7 +1,7 @@
 # attempt.real — the rehearsed target app for the timed Guinness feat.
-# "Fastest to build & run a working web app in a self-authored language."
-# A styled page + form + persistent storage + JSON API. Type this on camera,
-# then run it and show it working in the browser to stop the clock.
+# "Fastest to build & run a working web app in a self-authored programming language."
+# A styled page + form + persistent storage + JSON API. Zero JavaScript.
+# Type this on camera, run it, show it working in the browser to stop the clock.
 # run:  node ../realscript/realc.js attempt.real   ->  http://localhost:3000
 
 serve on 3000
@@ -9,16 +9,15 @@ store todos
 
 page "/" title "Todo" do
   show "<h1>Todo</h1>"
-  show "<form method=post action=/add class=card>
-    <input name=task placeholder='What needs doing?'>
-    <button>Add</button>
-  </form>"
-  show "<h2>" + todos.length + " tasks</h2>"
-  show todos.map(t => "<div class=card>" + t.task + "</div>").join('')
+  show "<form method=post action=/add class=card><input name=task placeholder='What needs doing?'><button>Add</button></form>"
+  show "<h2>" + count of todos + " tasks</h2>"
+  each t in todos do
+    show "<div class=card>" + safe t.task + "</div>"
+  end
 end
 
 on post "/add" do
-  todos.add({ task: body.task })
+  add { task: body.task } to todos
   redirect "/"
 end
 
