@@ -17,6 +17,11 @@ route "/hi" do
 end
 ```
 
+## Examples
+
+- **`examples/realblog.real`** — **RealBlog**, a real website: feed, search, single-post pages, admin login with server-side sessions, publish/draft/delete, JSON API (~110 lines).
+- **`examples/taskboard.real`** — RealTasks, a full CRUD app (~40 lines).
+- **`examples/guestbook.real`** — the simplest full-stack demo.
 ## Run it
 
 ```

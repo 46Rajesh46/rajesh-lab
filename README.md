@@ -16,8 +16,9 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 
 | Folder / file | What it is | Status |
 |---|---|---|
-| [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, **full CRUD** storage, JSON API, XSS-safe output. | working ✅ |
-| [`realscript/examples/taskboard.real`](realscript/examples/taskboard.real) | **RealTasks** — the flagship proof: a complete CRUD app (create/read/update/delete + JSON API + stats) in ~40 lines. | working ✅ |
+| [`realscript/`](realscript/) | **RealScript** — my full-stack web language. `.real` → JavaScript → live server. Pages, forms, **full CRUD** storage, sessions/auth, JSON API, XSS-safe output. | working ✅ |
+| [`realscript/examples/realblog.real`](realscript/examples/realblog.real) | **RealBlog** — the flagship proof: a real, functional **website** in ~110 lines. Feed, full-text search, single-post pages, **admin login with server-side sessions**, publish/draft/delete, JSON API. | working ✅ |
+| [`realscript/examples/taskboard.real`](realscript/examples/taskboard.real) | **RealTasks** — a complete CRUD app (create/read/update/delete + JSON API + stats) in ~40 lines. | working ✅ |
 | [`quantum/qscript.js`](quantum/qscript.js) | **QScript** — my quantum language (`qubits/h/x/z/cnot/measure`) on `qsim.js`. | working ✅ |
 | [`quantum/qsim.js`](quantum/qsim.js) | Pure-JS quantum simulator — runs a real entangled Bell state. | working ✅ |
 | [`lossless/`](lossless/) | **rz** — try-all lossless compressor + our `lpaq` context-mixing coder (beats gzip/brotli/xz on text). Installable CLI + benchmark. | working ✅ |
@@ -29,9 +30,10 @@ Runs with **no new software** — only Node (already on this PC via Laragon).
 ## Run it (nothing to install)
 
 ```bash
-# RealScript — RealTasks: a full CRUD app in ~40 lines. Open http://localhost:3000
-node realscript/realc.js realscript/examples/taskboard.real
-node realscript/realc.js realscript/examples/guestbook.real   # simpler demo
+# RealScript — RealBlog: a real website (feed, search, admin login, API)
+node realscript/realc.js realscript/examples/realblog.real   # -> localhost:3000  (admin pw: admin123)
+node realscript/realc.js realscript/examples/taskboard.real  # a CRUD app in ~40 lines
+node realscript/realc.js realscript/examples/guestbook.real  # simplest demo
 node realscript/realc.js --selftest                 # correctness tests
 
 # QScript — two qubits entangle (only 00/11 ever appear)
